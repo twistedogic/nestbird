@@ -3,9 +3,9 @@ package watcher
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"os/exec"
-	"strings"
 	"time"
 )
 
@@ -24,27 +24,19 @@ func NewNetBird(setupKeyFile string) *NetBird {
 }
 
 // IsConnected checks if NetBird is currently connected.
-// It executes `netbird status` and parses the output.
+// It executes `netbird status --json` and checks if the netbirdIp field is non-empty.
 func (n *NetBird) IsConnected(ctx context.Context) (bool, error) {
-	cmd := exec.CommandContext(ctx, "netbird", "status")
+	cmd := exec.CommandContext(ctx, "netbird", "status", "--json")
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 
 	err := cmd.Run()
 	if err != nil {
-		// Command failed - check if it's a connection error
-		errMsg := stderr.String()
-		if strings.Contains(errMsg, "connection") || strings.Contains(errMsg, "network") {
-			return false, nil // Disconnected due to network issues
-		}
-		return false, fmt.Errorf("netbird status failed: %w", err)
+		return false, fmt.Errorf("netbird status failed: %w (stderr: %s)", err, stderr.String())
 	}
 
-	output := stdout.String()
-	// Parse output - look for indicators of connected state
-	// NetBird status typically shows "Connected" or shows peer info when connected
-	return parseConnectedState(output), nil
+	return parseConnectedState(stdout.Bytes())
 }
 
 // upArgs returns the arguments for the netbird up command.
@@ -70,24 +62,17 @@ func (n *NetBird) Up(ctx context.Context) error {
 	return nil
 }
 
-// parseConnectedState checks if the status output indicates a connected state.
-// This is a simple heuristic - NetBird outputs vary, but typically includes
-// connection status in the output.
-func parseConnectedState(output string) bool {
-	output = strings.ToLower(output)
-	// Check for "disconnected" first - if present, we're not connected
-	if strings.Contains(output, "disconnected") {
-		return false
+// netbirdStatus is the minimal shape of `netbird status --json` output.
+type netbirdStatus struct {
+	NetbirdIP string `json:"netbirdIp"`
+}
+
+// parseConnectedState parses JSON from `netbird status --json` and returns true
+// when the netbirdIp field is non-empty.
+func parseConnectedState(data []byte) (bool, error) {
+	var status netbirdStatus
+	if err := json.Unmarshal(data, &status); err != nil {
+		return false, fmt.Errorf("failed to parse netbird status JSON: %w", err)
 	}
-	// Check for common "connected" indicators
-	indicators := []string{
-		"connection status: connected",
-		"peers:", // Peers section appears when connected
-	}
-	for _, indicator := range indicators {
-		if strings.Contains(output, indicator) {
-			return true
-		}
-	}
-	return false
+	return status.NetbirdIP != "", nil
 }

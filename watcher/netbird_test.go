@@ -36,52 +36,48 @@ func TestNetBirdUpArgs(t *testing.T) {
 
 func TestParseConnectedState(t *testing.T) {
 	tests := []struct {
-		name     string
-		output   string
-		expected bool
+		name        string
+		input       []byte
+		expected    bool
+		expectError bool
 	}{
 		{
-			name:     "Connected status",
-			output:   "Connection status: Connected\n",
+			name:     "connected with netbirdIp",
+			input:    []byte(`{"netbirdIp":"100.64.0.1"}`),
 			expected: true,
 		},
 		{
-			name:     "Connected (lowercase)",
-			output:   "connection status: connected\n",
-			expected: true,
-		},
-		{
-			name:     "Peers section indicates connected",
-			output:   "Peers: \n  - peer1: 10.0.0.1\n",
-			expected: true,
-		},
-		{
-			name:     "Disconnected status",
-			output:   "Connection status: Disconnected\n",
+			name:     "disconnected with empty netbirdIp",
+			input:    []byte(`{"netbirdIp":""}`),
 			expected: false,
 		},
 		{
-			name:     "Disconnected (lowercase)",
-			output:   "disconnected\n",
+			name:     "disconnected with missing netbirdIp field",
+			input:    []byte(`{}`),
 			expected: false,
 		},
 		{
-			name:     "Empty output",
-			output:   "",
-			expected: false,
-		},
-		{
-			name:     "Unknown status",
-			output:   "Some unknown status\n",
-			expected: false,
+			name:        "invalid JSON",
+			input:       []byte(`not json`),
+			expected:    false,
+			expectError: true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := parseConnectedState(tt.output)
+			result, err := parseConnectedState(tt.input)
+			if tt.expectError {
+				if err == nil {
+					t.Errorf("parseConnectedState() expected error, got nil")
+				}
+				return
+			}
+			if err != nil {
+				t.Errorf("parseConnectedState() unexpected error: %v", err)
+			}
 			if result != tt.expected {
-				t.Errorf("parseConnectedState(%q) = %v, want %v", tt.output, result, tt.expected)
+				t.Errorf("parseConnectedState() = %v, want %v", result, tt.expected)
 			}
 		})
 	}
