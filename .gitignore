@@ -1,0 +1,13 @@
+# Local agent skills
+.crush/
+.pi/
+
+# Binary
+nestbird
+
+# Go build cache
+*.test
+*.out
+
+# macOS
+.DS_Store

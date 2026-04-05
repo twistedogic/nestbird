@@ -1,0 +1,17 @@
+[Unit]
+Description=Nestbird - NetBird Connection Watcher
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/nestbird
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+# Uncomment and set to pass a setup key file to 'netbird up':
+# Environment=NETBIRD_SETUP_KEY_FILE=/etc/netbird/setup.key
+
+[Install]
+WantedBy=multi-user.target
